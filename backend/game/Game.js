@@ -44,6 +44,37 @@ class Game {
     }
 
 
+    getPonPlayers(){
+        const ponPlayers = [];
+        for(let i = 0; i < 4; i++){
+            if(i !== this.currentPlayer){
+                const player = this.players[i];
+                if(player.canPon(this.lastDiscard)){
+                    ponPlayers.push(player);
+                }
+            }
+        }
+        return ponPlayers;
+    }
+
+
+    pon(playerIndex){
+        const player = this.players[playerIndex];
+
+
+        if(!player.canPon(this.lastDiscard)){
+            return;
+        }
+
+        player.pon(this.lastDiscard);
+
+        this.lastDiscard = null;
+        this.currentPlayer = playerIndex;
+        
+
+    }
+
+
 }
 
 module.exports = Game;

@@ -1,5 +1,2 @@
 # mahjong
-# mahjong
-# mahjong
-# mahjong
-# mahjong
+in progress :)

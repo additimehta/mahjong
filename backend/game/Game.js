@@ -70,9 +70,22 @@ class Game {
 
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
+        player.discards.pop();
         
 
     }
+
+    chi(playerIndex){
+        const player = this.players[playerIndex];
+        if(!player.canChi(this.lastDiscard)){
+            return;
+        }
+
+        player.chi(this.lastDiscard);
+        this.lastDiscard = null;
+        this.currentPlayer = playerIndex;
+    }
+
 
 
 }

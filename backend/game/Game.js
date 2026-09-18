@@ -59,6 +59,7 @@ class Game {
 
 
     pon(playerIndex){
+        const discardingPlayer = this.players[this.currentPlayer];
         const player = this.players[playerIndex];
 
 
@@ -66,26 +67,27 @@ class Game {
             return;
         }
 
-        player.pon(this.lastDiscard);
-
+        player.pon(this.lastDiscard); // add the discarded tile to the player's melds
+        discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
-        player.discards.pop();
         
 
     }
 
     chi(playerIndex){
+        const discardingPlayer = this.players[this.currentPlayer];
         const player = this.players[playerIndex];
+
         if(!player.canChi(this.lastDiscard)){
             return;
         }
 
-        player.chi(this.lastDiscard);
+        player.chi(this.lastDiscard); // add the discarded tile to the player's melds
+        discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
     }
-
 
 
 }

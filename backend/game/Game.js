@@ -35,7 +35,7 @@ class Game {
 
 
     drawTile(){
-        if(this.phase != "draw"){{
+        if(this.phase != "draw"){
             return;
         }
         const player = this.players[this.currentPlayer];
@@ -44,7 +44,7 @@ class Game {
         this.phase = "discard";
     }
 
-    discardTile(tileIndex) {
+    discardTile(tileIndex){
         if(this.phase != "discard"){
             return;
         }
@@ -130,7 +130,7 @@ class Game {
         this.nextPlayer();
         this.phase = "draw"; 
     }
-    
+
 
 
 

@@ -45,7 +45,7 @@ function testNormalTurnFlow(){
         "A player should not be able to draw during the response phase"
     );
 
-    game.endResponsePhase();
+    game.handleNoClaim();
     assert.strictEqual(game.phase, "draw");
     assert.strictEqual(game.currentPlayer, 1);
     assert.strictEqual(game.lastDiscard, null);

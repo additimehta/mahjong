@@ -8,9 +8,17 @@ class Game {
         this.wall = [];
         this.currentPlayer = 0;
         this.lastDiscard = null;
+        // phase can be setup, draw, discard, response pon, chi, win ,
+
+        this.phase = "setup";
+        
     }
 
     setup(){
+
+        if(this.phase != "setup"){
+            return;
+        }
         // create the wall
         this.wall = createTileSet();
         shuffleTiles(this.wall);
@@ -20,22 +28,32 @@ class Game {
             this.players.push(new Player(i, `Player ${i+1}`));
             this.players[i].hand = this.wall.splice(0,13)
         }
-    
+
+        this.phase  = "draw";
         
     }
 
 
     drawTile(){
+        if(this.phase != "draw"){{
+            return;
+        }
         const player = this.players[this.currentPlayer];
         const tile = this.wall.pop();
         player.hand.push(tile);
+        this.phase = "discard";
     }
 
     discardTile(tileIndex) {
+        if(this.phase != "discard"){
+            return;
+        }
         const player = this.players[this.currentPlayer];
         const tile = player.hand.splice(tileIndex, 1)[0];
         player.discards.push(tile);
         this.lastDiscard = tile;
+
+        this.phase = "response";
 
     }
 
@@ -59,6 +77,10 @@ class Game {
 
 
     pon(playerIndex){
+        if(this.phase != "response"){ 
+            return;
+        }
+
         const discardingPlayer = this.players[this.currentPlayer];
         const player = this.players[playerIndex];
 
@@ -72,10 +94,14 @@ class Game {
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
         
+        this.phase = "discard";
 
     }
 
     chi(playerIndex){
+        if(this.phase != "response"){ 
+            return;
+        } 
         const nextPlayerIndex = (this.currentPlayer + 1) % 4;
         if(playerIndex !== nextPlayerIndex){
             return; // Only the next player can Chi
@@ -91,7 +117,21 @@ class Game {
         discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
+
+        this.phase = "discard";
     }
+
+    handleNoClaim(){
+        if(this.phase != "response"){
+            return;
+        }
+
+        this.lastDiscard = null;
+        this.nextPlayer();
+        this.phase = "draw"; 
+    }
+    
+
 
 
 }

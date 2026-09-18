@@ -76,6 +76,10 @@ class Game {
     }
 
     chi(playerIndex){
+        const nextPlayerIndex = (this.currentPlayer + 1) % 4;
+        if(playerIndex !== nextPlayerIndex){
+            return; // Only the next player can Chi
+        }
         const discardingPlayer = this.players[this.currentPlayer];
         const player = this.players[playerIndex];
 

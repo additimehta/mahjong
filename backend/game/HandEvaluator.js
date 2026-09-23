@@ -8,10 +8,17 @@ function isSevenPairs(hand, melds = []){
     for(const tile of hand){
         const key = `${tile.suit}-${tile.value}`;
 
+        // new tile found
         if(counts[key] === undefined){
             counts[key] = 1;
         }else{
             counts[key]++;
+        }
+    }
+
+    for(let i = 0; i < Object.values(counts).length; i++){
+        if(Object.values(counts)[i] > 2){
+            return false;
         }
     }
 
@@ -21,7 +28,7 @@ function isSevenPairs(hand, melds = []){
         return false;
     }
 
-    return tileCounts.every(tileCount => tileCount === 2);
+    return true;
 }
 
 function isWinningHand(hand, melds = []){

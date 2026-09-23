@@ -1,36 +1,39 @@
-
-// a meld is either a sequence or triplet or 4 of a kind
-function isWinningHand(hand, melds = []){
-
-
-    // 4 melds + 1 pair
-    const meldsNeeded = 4 - melds.length;
-    const expectedHandsize = meldsNeeded *3 + 2;
-
-
-    if(hand.length !== expectedHandsize - 2){
+function isSevenPairs(hand, melds = []){
+    if(hand.length !== 14 || melds.length !== 0){
         return false;
     }
 
-    // 7 pairs - no melds
-    const count = {};
+    const counts = {};
 
     for(const tile of hand){
-        const key = `${tile.suit}-${tile.value}`; 
-        if(count[key]){
-            count[key]++;
+        const key = `${tile.suit}-${tile.value}`;
+
+        if(counts[key] === undefined){
+            counts[key] = 1;
         }else{
-            count[key] = 0;
+            counts[key]++;
         }
     }
 
-    // convert to flat array 
-    const tileCounts = Object.values(count);
-    if(count.length != 7){
+    const tileCounts = Object.values(counts);
+
+    if(tileCounts.length !== 7){
         return false;
     }
-    return tileCounts.every(count => count === 2);
 
+    return tileCounts.every(tileCount => tileCount === 2);
 }
 
-module.exports = isWinningHand;
+function isWinningHand(hand, melds = []){
+    if(isSevenPairs(hand, melds)){
+        return true;
+    }
+
+    // Standard hand detection will be added next
+    return false;
+}
+
+module.exports = {
+    isWinningHand,
+    isSevenPairs
+};

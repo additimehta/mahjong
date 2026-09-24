@@ -31,6 +31,35 @@ function isSevenPairs(hand, melds = []){
     return true;
 }
 
+
+function canFormMelds(hand, melds=[]){
+    // backtrack by removing those pairs
+}
+function canFormMeld(hand, melds = []){
+    //detect that there exists 4 melds and a pair
+    const frequencyMap = new Map();
+    for(const tile of hand){
+        const key = '${tile.suit}-${tile.value}';
+        if(frequencyMap.has(key)){
+            frequencyMap.set(key, frequencyMap.get(key) + 1);
+        }else
+            frequencyMap.set(key, 1);
+    }
+
+    for(const [key, count] of frequencyMap.entries()){
+        if(count >= 2){
+            const remainingTiles = hand.filter(tile => '${tile.suit}-${tile.value}' !== key);
+            if(canFormMelds(remainingTiles, melds)){
+                return true;
+            }
+        }
+    }
+
+
+
+
+
+}
 function isWinningHand(hand, melds = []){
     if(isSevenPairs(hand, melds)){
         return true;

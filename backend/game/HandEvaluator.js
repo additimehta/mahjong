@@ -32,11 +32,70 @@ function isSevenPairs(hand, melds = []){
 }
 
 
+// trying the hands and melds arrange into melds
 function canFormMelds(hand, melds=[]){
-    // backtrack by removing those pairs
+
+    // base case
+    if(hands.length === 0 && melds.length === 4){
+        return true;
+    }
+
+
+
+    // TO DO: backtrack by removing those pairs
+
+
+    // take first tile
+    // can make a triplet?
+    // yes -> remove hand and recurse on remainign 
+    // if succeeds then return true
+    // else put back the tile you were trying to make a triplet
+
+    const tile = hand[0];
+    let count = 0;
+    for(const t of hand){
+        if(t.suit === tile.suit && t.value === tile.value){
+            count++;
+        }
+
+    } 
+    
+    if(count >= 3){
+
+        const newHand = [...hand];
+        let removed = 0;
+        for(let i = newHand.length-1; i >=0 && removed < 3; i--){
+            if(newHand[i].suit == tile.suit && newHand[i].value == tile.value){
+                newHand.splice(i, 1);
+                removed++;
+            }
+        }
+    }
+
+
+    // can I make a sequence?
+    // yes -> remove tile, tile+1, tile+2 
+    //      recurse on remaining
+    // if succeeds then return true
+    // else put back the tile you were trying to make a sequence
+
+
+
+
+
+
+
 }
-function canFormMeld(hand, melds = []){
-    //detect that there exists 4 melds and a pair
+
+
+
+
+
+
+
+
+//detect that there exists 4 melds and a pair
+function canFormStandardHand(hand, melds = []){
     const frequencyMap = new Map();
     for(const tile of hand){
         const key = '${tile.suit}-${tile.value}';
@@ -64,6 +123,9 @@ function isWinningHand(hand, melds = []){
     if(isSevenPairs(hand, melds)){
         return true;
     }
+
+
+    // TO DO: Add the remaining winning hand combinations to check
 
     // Standard hand detection will be added next
     return false;

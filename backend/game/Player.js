@@ -49,22 +49,9 @@ class Player {
         // Chi can only happen if the player has 2 tile that can form a sequence with discareded tile
         const val = tile.value;
 
-
-        if(this.hand.some(t=> t.suit == tile.suit && t.value == val - 2) &&
-            this.hand.some(t=> t.suit == tile.suit && t.value == val - 1)){
-                return true;
+        if(canMakeSequence(this.hand, tile)){
+            return true;
         }
-
-
-        if(this.hand.some(t=> t.suit == tile.suit && t.value == val - 1) &&
-            this.hand.some(t=> t.suit == tile.suit && t.value == val + 1)){
-                return true;
-        }   
-
-        if(this.hand.some(t=> t.suit == tile.suit && t.value == val + 1) &&
-            this.hand.some(t=> t.suit == tile.suit && t.value == val + 2)){
-                return true;
-        }   
         return false;
     }
 

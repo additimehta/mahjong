@@ -1,4 +1,5 @@
 const createTileSet = require("./Deck");
+const { canMakeSequence } = require("./utils");
 
 class Player {
     constructor(id, displayName) {
@@ -14,18 +15,7 @@ class Player {
     //  2 same tile in their hand that matches the discarded tile
 
     canPon(tile){
-        let count = 0;
-        for(const handTile of this.hand){
-            if(handTile.suit == tile.suit && handTile.value == tile.value){
-                count++;
-            }
-        }
-
-        if(count >= 2){
-            return true;
-        }else{
-            return false;
-        }
+        return canMakeTriplets(this.hand, tile);
     }
 
     pon(tile){
@@ -47,12 +37,7 @@ class Player {
 
     canChi(tile){
         // Chi can only happen if the player has 2 tile that can form a sequence with discareded tile
-        const val = tile.value;
-
-        if(canMakeSequence(this.hand, tile)){
-            return true;
-        }
-        return false;
+       return canMakeSequence(this.hand, tile);
     }
 
     chi(tile) {

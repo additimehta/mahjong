@@ -35,9 +35,13 @@ function isSevenPairs(hand, melds = []){
 // trying the hands and melds arrange into melds
 function canFormMelds(hand, melds=[]){
 
-    // base case
-    if(hands.length === 0 && melds.length === 4){
-        return true;
+    // base case, empty hand but full of melds
+    if(hand.length === 0) {
+        return melds.length === 4;
+    }
+
+    if(melds.length >= 4){
+        return false;
     }
 
 
@@ -52,25 +56,16 @@ function canFormMelds(hand, melds=[]){
     // else put back the tile you were trying to make a triplet
 
     const tile = hand[0];
-    let count = 0;
-    for(const t of hand){
-        if(t.suit === tile.suit && t.value === tile.value){
-            count++;
-        }
+    if(canMakeTriplets(hand, tile)){
+        const remaining = removeTriplet(hand, tile); 
 
-    } 
-    
-    if(count >= 3){
-
-        const newHand = [...hand];
-        let removed = 0;
-        for(let i = newHand.length-1; i >=0 && removed < 3; i--){
-            if(newHand[i].suit == tile.suit && newHand[i].value == tile.value){
-                newHand.splice(i, 1);
-                removed++;
-            }
+        // keep making recursive calls on the rest of the hands
+        if(canFormMelds(remaining, [...melds, [tile, tile, tile]])){
+            return true;
         }
     }
+
+   
 
 
     // can I make a sequence?
@@ -78,6 +73,8 @@ function canFormMelds(hand, melds=[]){
     //      recurse on remaining
     // if succeeds then return true
     // else put back the tile you were trying to make a sequence
+
+    ///if(canMakeSequence)
 
 
 

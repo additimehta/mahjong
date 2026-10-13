@@ -1,3 +1,5 @@
+const { canMakeTriplets, removeTriplet, removeSequence } = require('./MeldUtils.js');
+
 function isSevenPairs(hand, melds = []){
     if(hand.length !== 14 || melds.length !== 0){
         return false;
@@ -32,103 +34,132 @@ function isSevenPairs(hand, melds = []){
 }
 
 
-// trying the hands and melds arrange into melds
-function canFormMelds(hand, melds=[]){
-
-    // base case, empty hand but full of melds
-    if(hand.length === 0) {
-        return melds.length === 4;
-    }
-
-    if(melds.length >= 4){
+function HalfFlush(hand, melds = []){
+    if(!isWinningHand(hand, melds)){
         return false;
     }
 
+    const allTiles = [...hand, ...melds.flat()]; 
+    
+}
 
+// Kokushi musou: all thirteen terminal/honor types and one duplicate.
+function isThirteenOrphans(hand, melds = []){
+    if(hand.length !== 14 || melds.length !== 0){
+        return false;
+    }
+    const required = new Set([
+        'man-1', 'man-9', 'pin-1', 'pin-9', 'bamboo-1', 'bamboo-9',
+        'wind-east', 'wind-south', 'wind-west', 'wind-north',
+        'dragon-red', 'dragon-green', 'dragon-white'
+    ]);
+    const counts = new Map();
+    for(const tile of hand){
+        const key = `${tile.suit}-${tile.value}`;
+        if(!required.has(key)){
+            return false;
+        }
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts.size === 13;
+}
 
-    // TO DO: backtrack by removing those pairs
+// The lowest tile can only start a sequence or belong to a triplet.
+function canFormMelds(hand, melds = []){
+    if(hand.length === 0){
+        return melds.length === 4;
+    }
+    if(melds.length >= 4 || hand.length !== (4 - melds.length) * 3){
+        return false;
+    }
 
+    const sortedHand = [...hand].sort((a, b) =>
+        a.suit.localeCompare(b.suit) ||
+        (typeof a.value === 'number' ? a.value - b.value : String(a.value).localeCompare(String(b.value)))
+    );
+    const tile = sortedHand[0];
 
-    // take first tile
-    // can make a triplet?
-    // yes -> remove hand and recurse on remainign 
-    // if succeeds then return true
-    // else put back the tile you were trying to make a triplet
-
-    const tile = hand[0];
-    if(canMakeTriplets(hand, tile)){
-        const remaining = removeTriplet(hand, tile); 
-
-        // keep making recursive calls on the rest of the hands
+    if(canMakeTriplets(sortedHand, tile)){
+        const remaining = removeTriplet(sortedHand, tile);
         if(canFormMelds(remaining, [...melds, [tile, tile, tile]])){
             return true;
         }
     }
 
-   
-
-
-    // can I make a sequence?
-    // yes -> remove tile, tile+1, tile+2 
-    //      recurse on remaining
-    // if succeeds then return true
-    // else put back the tile you were trying to make a sequence
-
-    ///if(canMakeSequence)
-
-
-
-
-
-
-
-}
-
-
-
-
-
-
-
-
-//detect that there exists 4 melds and a pair
-function canFormStandardHand(hand, melds = []){
-    const frequencyMap = new Map();
-    for(const tile of hand){
-        const key = '${tile.suit}-${tile.value}';
-        if(frequencyMap.has(key)){
-            frequencyMap.set(key, frequencyMap.get(key) + 1);
-        }else
-            frequencyMap.set(key, 1);
-    }
-
-    for(const [key, count] of frequencyMap.entries()){
-        if(count >= 2){
-            const remainingTiles = hand.filter(tile => '${tile.suit}-${tile.value}' !== key);
-            if(canFormMelds(remainingTiles, melds)){
-                return true;
-            }
+    const remaining = removeSequence(sortedHand, tile, tile.value);
+    if(remaining !== null){
+        const sequence = [tile, {suit: tile.suit, value: tile.value + 1}, {suit: tile.suit, value: tile.value + 2}];
+        if(canFormMelds(remaining, [...melds, sequence])){
+            return true;
         }
     }
-
-
-
-
-
+    return false;
 }
+
+
+// a standard hand is 4 melds and a pair, with the melds being either triplets or sequences. 
+// This function checks if the hand can be arranged into such a structure.
+function canFormStandardHand(hand, melds = []){
+
+    // check if the lenght is fine
+    if(melds.length > 4 || hand.length !== (4 - melds.length) * 3 + 2){
+        return false;
+    }
+    // make a frequenyc map of the tiles in the hand to find pairs
+    const frequencyMap = new Map();
+    for(const tile of hand){
+        const key = `${tile.suit}-${tile.value}`;
+        frequencyMap.set(key, (frequencyMap.get(key) || 0) + 1);
+    }
+
+    for(const [key, count] of frequencyMap){
+        if(count < 2){
+            continue;
+        }
+        let removed = 0;
+        const remainingTiles = hand.filter(tile => {
+            if(`${tile.suit}-${tile.value}` === key && removed < 2){
+                removed++;
+                return false;
+            }
+            return true;
+        });
+        if(canFormMelds(remainingTiles, melds)){
+            return true;
+        }
+    }
+    return false;
+}
+
+// All Simples is a completed hand containing only suited tiles numbered 2–8. NO TERMINALs
+// Declared melds are included; open All Simples is allowed.
+function isAllSimples(hand, melds = []){
+    const allTiles = [...hand, ...melds.flat()];
+    if(!allTiles.every(tile =>
+        ['man', 'pin', 'bamboo'].includes(tile.suit) &&
+        Number.isInteger(tile.value) && tile.value >= 2 && tile.value <= 8
+    )){
+        return false;
+    }
+    return isWinningHand(hand, melds);
+}
+
+// Checks complete hand shapes; yaku and ron/tsumo eligibility are separate checks.
 function isWinningHand(hand, melds = []){
-    if(isSevenPairs(hand, melds)){
+    if(isSevenPairs(hand, melds) || isThirteenOrphans(hand, melds)){
         return true;
     }
 
 
-    // TO DO: Add the remaining winning hand combinations to check
-
-    // Standard hand detection will be added next
-    return false;
+    return canFormStandardHand(hand, melds);
 }
 
 module.exports = {
     isWinningHand,
-    isSevenPairs
+    isSevenPairs,
+    isThirteenOrphans,
+    isAllSimples
+    
+
 };
+

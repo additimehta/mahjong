@@ -8,6 +8,8 @@ class Game {
         this.wall = [];
         this.currentPlayer = 0;
         this.lastDiscard = null;
+        this.lastDraw = null;
+        this.roundWind = 'east';
         // phase can be setup, draw, discard, response pon, chi, win ,
 
         this.phase = "setup";
@@ -25,7 +27,8 @@ class Game {
 
         // create players;
         for(let i = 0; i < 4; i++){
-            this.players.push(new Player(i, `Player ${i+1}`));
+            const seatWind = ['east', 'south', 'west', 'north'][i];
+            this.players.push(new Player(i, `Player ${i+1}`, seatWind));
             this.players[i].hand = this.wall.splice(0,13)
         }
 
@@ -41,6 +44,7 @@ class Game {
         const player = this.players[this.currentPlayer];
         const tile = this.wall.pop();
         player.hand.push(tile);
+        this.lastDraw = tile;
         this.phase = "discard";
     }
 
@@ -52,6 +56,7 @@ class Game {
         const tile = player.hand.splice(tileIndex, 1)[0];
         player.discards.push(tile);
         this.lastDiscard = tile;
+        this.lastDraw = null;
 
         this.phase = "response";
 
@@ -59,6 +64,37 @@ class Game {
 
     nextPlayer(){
         this.currentPlayer  = (this.currentPlayer + 1) % 4;
+    }
+
+    // Prepare evaluator input; this does not authorize a win or check yaku/furiten.
+    // Ron adds the discard to a copy. Tsumo already has the drawn tile in hand.
+    getWinEvaluationInput(playerIndex, winMethod){
+        const player = this.players[playerIndex];
+        if(!player){
+            throw new Error('Unknown player');
+        }
+        const isRon = winMethod === 'ron';
+        const isTsumo = winMethod === 'tsumo';
+        if(!isRon && !isTsumo){
+            throw new Error('Win method must be ron or tsumo');
+        }
+        if(isRon && (this.phase !== 'response' || playerIndex === this.currentPlayer || !this.lastDiscard)){
+            throw new Error('Ron requires another player\'s discard during the response phase');
+        }
+        if(isTsumo && (this.phase !== 'discard' || playerIndex !== this.currentPlayer || !this.lastDraw)){
+            throw new Error('Tsumo requires the current player\'s drawn tile');
+        }
+        return {
+            hand: isRon ? [...player.hand, this.lastDiscard] : [...player.hand],
+            melds: player.melds,
+            context: {
+                winningTile: isRon ? this.lastDiscard : this.lastDraw,
+                winMethod,
+                seatWind: player.seatWind,
+                roundWind: this.roundWind,
+                riichi: player.riichi
+            }
+        };
     }
 
 
@@ -90,6 +126,7 @@ class Game {
         }
 
         player.pon(this.lastDiscard); // add the discarded tile to the player's melds
+        this.lastDraw = null;
         discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;
@@ -114,6 +151,7 @@ class Game {
         }
 
         player.chi(this.lastDiscard); // add the discarded tile to the player's melds
+        this.lastDraw = null;
         discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
         this.lastDiscard = null;
         this.currentPlayer = playerIndex;

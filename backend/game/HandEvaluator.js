@@ -34,13 +34,23 @@ function isSevenPairs(hand, melds = []){
 }
 
 
+// Honitsu: a completed hand with exactly one numbered suit and at least one honor.
 function HalfFlush(hand, melds = []){
     if(!isWinningHand(hand, melds)){
         return false;
     }
 
-    const allTiles = [...hand, ...melds.flat()]; 
-    
+    const allTiles = [...hand, ...melds.flatMap(meld => meld.tiles)];
+    const suits = new Set();
+    let hasHonor = false;
+    for(const tile of allTiles){
+        if(tile.suit === 'wind' || tile.suit === 'dragon'){
+            hasHonor = true;
+        }else{
+            suits.add(tile.suit);
+        }
+    }
+    return hasHonor && suits.size === 1;
 }
 
 // Kokushi musou: all thirteen terminal/honor types and one duplicate.
@@ -100,7 +110,10 @@ function canFormMelds(hand, melds = []){
 // a standard hand is 4 melds and a pair, with the melds being either triplets or sequences. 
 // This function checks if the hand can be arranged into such a structure.
 function canFormStandardHand(hand, melds = []){
-
+    // Even with four declared melds, the concealed hand must contain a pair.
+    if(hand.length === 0){
+        return false;
+    }
     // check if the lenght is fine
     if(melds.length > 4 || hand.length !== (4 - melds.length) * 3 + 2){
         return false;
@@ -134,7 +147,7 @@ function canFormStandardHand(hand, melds = []){
 // All Simples is a completed hand containing only suited tiles numbered 2–8. NO TERMINALs
 // Declared melds are included; open All Simples is allowed.
 function isAllSimples(hand, melds = []){
-    const allTiles = [...hand, ...melds.flat()];
+    const allTiles = [...hand, ...melds.flatMap(meld => meld.tiles)];
     if(!allTiles.every(tile =>
         ['man', 'pin', 'bamboo'].includes(tile.suit) &&
         Number.isInteger(tile.value) && tile.value >= 2 && tile.value <= 8
@@ -158,7 +171,8 @@ module.exports = {
     isWinningHand,
     isSevenPairs,
     isThirteenOrphans,
-    isAllSimples
+    isAllSimples,
+    HalfFlush
     
 
 };

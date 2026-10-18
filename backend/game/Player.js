@@ -1,13 +1,21 @@
-const createTileSet = require("./Deck");
-const { canMakeSequence } = require("./utils");
+const { canMakeSequence } = require("./MeldUtils");
 
 class Player {
-    constructor(id, displayName) {
+    constructor(id, displayName, seatWind = null) {
         this.id = id;
         this.displayName = displayName;
         this.hand = [];
         this.discards = [];
+        // Declared melds hold metadata: { type: 'chi' | 'pon' | 'kan', tiles: Tile[], open: boolean }.
+        // open is true for calls using another player's discard (including an upgraded pon),
+        // and false for a concealed kan. Any open meld makes the whole hand open.
         this.melds = [];
+        this.seatWind = seatWind;
+        this.riichi = false;
+    }
+
+    isClosed(){
+        return !this.melds.some(meld => meld.open);
     }
 
 
@@ -15,7 +23,7 @@ class Player {
     //  2 same tile in their hand that matches the discarded tile
 
     canPon(tile){
-        return canMakeTriplets(this.hand, tile);
+        return this.hand.filter(t => t.suit === tile.suit && t.value === tile.value).length >= 2;
     }
 
     pon(tile){
@@ -31,7 +39,7 @@ class Player {
                     i--;
                 }
             }
-            this.melds.push(meld);
+            this.melds.push({type: 'pon', tiles: meld, open: true});
         }
     }
 
@@ -74,6 +82,7 @@ class Player {
                     values.includes(this.hand[i].value)
                 ) {
                     meld.push(this.hand.splice(i, 1)[0]);
+                    values.splice(values.indexOf(meld[meld.length - 1].value), 1);
                     i--;
     
                     if (meld.length == 3) {
@@ -82,7 +91,7 @@ class Player {
                 }
             }
     
-            this.melds.push(meld);
+            this.melds.push({type: 'chi', tiles: meld, open: true});
         }
     }
 

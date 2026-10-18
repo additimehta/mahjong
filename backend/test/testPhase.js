@@ -74,7 +74,7 @@ function testPonFlow(){
     assert.strictEqual(game.lastDiscard, null);
     assert.strictEqual(game.players[0].discards.length, 0);
     assert.strictEqual(game.players[2].melds.length, 1);
-    assert.strictEqual(game.players[2].melds[0].length, 3);
+    assert.strictEqual(game.players[2].melds[0].tiles.length, 3);
 }
 
 function testChiFlow(){
@@ -100,7 +100,7 @@ function testChiFlow(){
     assert.strictEqual(game.lastDiscard, null);
     assert.strictEqual(game.players[0].discards.length, 0);
     assert.strictEqual(game.players[1].melds.length, 1);
-    assert.strictEqual(game.players[1].melds[0].length, 3);
+    assert.strictEqual(game.players[1].melds[0].tiles.length, 3);
 }
 
 testNormalTurnFlow();

@@ -44,11 +44,11 @@ function testWrongHandSize(){
 
 function testOpenHand(){
     const hand = createValidSevenPairsHand();
-    const melds = [[
+    const melds = [{type: 'chi', open: true, tiles: [
         tile("pin", 1),
         tile("pin", 2),
         tile("pin", 3)
-    ]];
+    ]}];
 
     assert.strictEqual(
         isSevenPairs(hand, melds),

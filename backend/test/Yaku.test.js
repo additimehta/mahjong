@@ -70,3 +70,40 @@ test('incomplete hands have no yaku and kokushi excludes ordinary yaku', () => {
         ...tiles('wind',['east','south','west','north']),...tiles('dragon',['red','green','white','white'])];
     assert.deepEqual(evaluateYaku(hand,[],{...context,riichi:true,winMethod:'tsumo'}),[{name:'kokushiMusou',yakuman:1}]);
 });
+
+test('iipeikou awards one han for identical sequences and combines with pinfu and riichi', () => {
+    const hand = [...tiles('man',[1,2,3,1,2,3]),...tiles('pin',[4,5,6]),
+        ...tiles('bamboo',[7,8,9]),...tiles('wind',['north','north'])];
+    const ctx = {...context,riichi:true,winningTile:{suit:'pin',value:4}};
+    const before = JSON.stringify({hand,ctx});
+    const result = evaluateYaku(hand,[],ctx);
+    assert.deepEqual(result,[{name:'riichi',han:1},{name:'pinfu',han:1},{name:'iipeikou',han:1}]);
+    assert.equal(JSON.stringify({hand,ctx}),before);
+    assert.equal(find(hand.slice(9),[
+        {type:'chi',open:true,tiles:hand.slice(0,3)},
+        {type:'chi',open:true,tiles:hand.slice(3,6)},
+        {type:'chi',open:true,tiles:hand.slice(6,9)}
+    ],ctx,'iipeikou'),undefined);
+});
+
+test('iipeikou requires matching ranks and suits, and a closed hand including unrelated groups', () => {
+    const duplicate = tiles('man',[1,2,3,1,2,3]);
+    const tail = [...tiles('pin',[4,5,6]),...tiles('wind',['north','north'])];
+    for(const open of [true,false]){
+        const melds = [{type:'kan',open,tiles:tiles('bamboo',[8,8,8,8])}];
+        assert.equal(find([...duplicate,...tail],melds,context,'iipeikou')?.han,open ? undefined : 1);
+    }
+    for(const other of [tiles('pin',[1,2,3]),tiles('man',[2,3,4])]){
+        const hand = [...duplicate.slice(0,3),...other,...tail,...tiles('bamboo',[7,8,9])];
+        assert.equal(find(hand,[],context,'iipeikou'),undefined);
+    }
+});
+
+test('iipeikou counts triple identical sequences once and does not stack with seven pairs', () => {
+    const triple = [...tiles('man',[1,1,1,2,2,2,3,3,3]),...tiles('pin',[4,5,6]),...tiles('wind',['north','north'])];
+    assert.equal(find(triple,[],context,'iipeikou').han,1);
+    const twoPairs = [...tiles('man',[1,1,2,2,3,3]),...tiles('pin',[4,4,5,5,6,6]),...tiles('wind',['north','north'])];
+    const result = evaluateYaku(twoPairs,[],context);
+    assert.ok(result.some(yaku => yaku.name === 'chiitoitsu'));
+    assert.ok(!result.some(yaku => yaku.name === 'iipeikou'));
+});

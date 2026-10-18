@@ -230,6 +230,23 @@ function hasPinfu(arrangement, melds, isClosed, context){
     });
 }
 
+// TODO: Remaining standard yaku:
+// - Ryanpeikou: two pairs of identical sequences; replaces Iipeikou.
+// - Sanshoku doujun / Ittsu: same sequence in all suits / 123+456+789 in one suit.
+// - Chanta / Junchan: every group and pair includes a terminal or honor / terminal only,
+//   with at least one sequence; Junchan excludes honors.
+// - Sanshoku doukou / Sanankou / Sankantsu: same-rank triplets in all suits /
+//   three concealed triplets or kans / three kans. Ron-completed triplets need special handling.
+// - Honroutou / Shousangen: only terminals and honors / two dragon groups and a dragon pair.
+// - Double riichi, Ippatsu, Haitei, Houtei, Rinshan kaihou, Chankan:
+//   require validated declaration, turn, wall, and kan-event context from the game.
+// TODO: Remaining standard yakuman: Suuankou, Daisangen, Shousuushii, Daisuushii,
+// Tsuuiisou, Chinroutou, Ryuuiisou, Chuuren poutou, Suukantsu, Tenhou, Chiihou.
+// Evaluate applicable yakuman together before ordinary yaku; decide rules for stacking,
+// double-yakuman variants, and optional/local yaku separately.
+// TODO: Win eligibility belongs in game logic: require at least one yaku and enforce
+// furiten for ron. Scoring also needs fu, dora/ura-dora/aka-dora (bonuses, not yaku),
+// limits, payments, and selection of the arrangement with the highest final points.
 function evaluateYaku(hand, melds = [], context = {}){
     const yaku = [];
     if(!isWinningHand(hand, melds)){
@@ -282,6 +299,24 @@ function evaluateYaku(hand, melds = [], context = {}){
         if(yakuhaiHan > 0) result.push({name: 'yakuhai', han: yakuhaiHan});
         if(triplets.length === 4) result.push({name: 'toitoi', han: 2});
         if(hasPinfu(arrangement, melds, isClosed, context)) result.push({name: 'pinfu', han: 1});
+        // Iipeikou: 1 han, closed hand only, for two sequences with identical ranks
+        // in the same suit (e.g. man 123 + man 123). An unrelated open call also
+        // disqualifies it; a concealed kan keeps the hand closed.
+        // Count within this arrangement so it never combines with Seven Pairs.
+        if(isClosed){
+            const sequenceCounts = new Map();
+            for(const group of arrangement.groups){
+                if(group.type !== 'chi') continue;
+                const first = group.tiles[0];
+                const key = `${first.suit}-${first.value}`;
+                sequenceCounts.set(key, (sequenceCounts.get(key) || 0) + 1);
+            }
+            // Three copies of one sequence contain one pair, not two overlapping pairs.
+            const identicalPairs = [...sequenceCounts.values()]
+                .reduce((sum, count) => sum + Math.floor(count / 2), 0);
+            // Two pairs belong to Ryanpeikou, which is not implemented yet.
+            if(identicalPairs === 1) result.push({name: 'iipeikou', han: 1});
+        }
         candidates.push(result);
     }
     // Select the highest han interpretation among the currently supported yaku.

@@ -47,3 +47,17 @@ test('mixed melds succeed and incomplete arrangements fail', () => {
     assert.equal(isWinningHand(hand), true);
     assert.equal(isWinningHand([...tiles('man', [1,1,1,2,3,5,6,7,8,7,8,9]), ...tiles('dragon', ['red','red'])]), false);
 });
+
+test('declared kans count as one group regardless of openness without mutation', () => {
+    const hand = [...tiles('man', [1,2,3,4,5,6]), ...tiles('dragon', ['red','red'])];
+    for(const open of [false, true]){
+        const melds = [
+            {type: 'kan', tiles: tiles('pin', [2,2,2,2]), open},
+            {type: 'pon', tiles: tiles('wind', ['east','east','east']), open: true}
+        ];
+        const before = JSON.stringify({hand, melds});
+        assert.equal(isWinningHand(hand, melds), true);
+        assert.equal(isWinningHand(hand.slice(1), melds), false);
+        assert.equal(JSON.stringify({hand, melds}), before);
+    }
+});

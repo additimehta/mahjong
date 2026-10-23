@@ -59,8 +59,9 @@ test('ambiguous seven pairs and sequence arrangements do not combine incompatibl
     const hand = tiles('man',[2,2,3,3,4,4,5,5,6,6,7,7,8,8]);
     const before = JSON.stringify(hand);
     const result = evaluateYaku(hand,[],{...context,winningTile:{suit:'man',value:2}});
-    assert.ok(result.some(yaku => yaku.name === 'chiitoitsu'));
-    assert.ok(!result.some(yaku => yaku.name === 'pinfu'));
+    assert.ok(result.some(yaku => yaku.name === 'ryanpeikou'));
+    assert.ok(!result.some(yaku => yaku.name === 'chiitoitsu'));
+    assert.ok(result.some(yaku => yaku.name === 'pinfu'));
     assert.equal(JSON.stringify(hand),before);
 });
 
@@ -104,6 +105,7 @@ test('iipeikou counts triple identical sequences once and does not stack with se
     assert.equal(find(triple,[],context,'iipeikou').han,1);
     const twoPairs = [...tiles('man',[1,1,2,2,3,3]),...tiles('pin',[4,4,5,5,6,6]),...tiles('wind',['north','north'])];
     const result = evaluateYaku(twoPairs,[],context);
-    assert.ok(result.some(yaku => yaku.name === 'chiitoitsu'));
+    assert.ok(result.some(yaku => yaku.name === 'ryanpeikou'));
+    assert.ok(!result.some(yaku => yaku.name === 'chiitoitsu'));
     assert.ok(!result.some(yaku => yaku.name === 'iipeikou'));
 });

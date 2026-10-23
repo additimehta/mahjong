@@ -230,30 +230,87 @@ function hasPinfu(arrangement, melds, isClosed, context){
     });
 }
 
-// TODO: Remaining standard yaku:
-// - Ryanpeikou: two pairs of identical sequences; replaces Iipeikou.
-// - Sanshoku doujun / Ittsu: same sequence in all suits / 123+456+789 in one suit.
-// - Chanta / Junchan: every group and pair includes a terminal or honor / terminal only,
-//   with at least one sequence; Junchan excludes honors.
-// - Sanshoku doukou / Sanankou / Sankantsu: same-rank triplets in all suits /
-//   three concealed triplets or kans / three kans. Ron-completed triplets need special handling.
-// - Honroutou / Shousangen: only terminals and honors / two dragon groups and a dragon pair.
-// - Double riichi, Ippatsu, Haitei, Houtei, Rinshan kaihou, Chankan:
-//   require validated declaration, turn, wall, and kan-event context from the game.
-// TODO: Remaining standard yakuman: Suuankou, Daisangen, Shousuushii, Daisuushii,
-// Tsuuiisou, Chinroutou, Ryuuiisou, Chuuren poutou, Suukantsu, Tenhou, Chiihou.
-// Evaluate applicable yakuman together before ordinary yaku; decide rules for stacking,
-// double-yakuman variants, and optional/local yaku separately.
-// TODO: Win eligibility belongs in game logic: require at least one yaku and enforce
-// furiten for ron. Scoring also needs fu, dora/ura-dora/aka-dora (bonuses, not yaku),
-// limits, payments, and selection of the arrangement with the highest final points.
+
+const isHonor = tile => tile.suit === 'wind' || tile.suit === 'dragon';
+const isTerminal = tile => ['man', 'pin', 'bamboo'].includes(tile.suit) &&
+    (tile.value === 1 || tile.value === 9);
+const sameTile = (a, b) => a && b && a.suit === b.suit && a.value === b.value;
+
+// A winning tile can belong to multiple groups. Evaluate each placement separately:
+// a ron-completed triplet is exposed for Sanankou/Suuankou, but the hand stays closed.
+function winningPlacements(arrangement, melds, context){
+    const placements = [];
+    if(context.winningTile){
+        if(sameTile(arrangement.pair, context.winningTile)) placements.push(-1);
+        arrangement.groups.forEach((group, index) => {
+            if(index >= melds.length && group.tiles.some(tile => sameTile(tile, context.winningTile))){
+                placements.push(index);
+            }
+        });
+    }
+    return placements.length ? placements : [null];
+}
+
+function arrangementYaku(arrangement, melds, isClosed, context, placement){
+    const ordinary = [];
+    const yakuman = [];
+    const add = (name, han) => ordinary.push({name, han});
+    const limit = name => yakuman.push({name, yakuman: 1});
+    const {groups, pair} = arrangement;
+    const sequences = groups.filter(group => group.type === 'chi');
+    const triplets = groups.filter(group => group.type === 'pon' || group.type === 'kan');
+    const kans = triplets.filter(group => group.type === 'kan').length;
+    const concealed = groups.filter((group, index) => {
+        if(group.type === 'chi' || group.open) return false;
+        if(index < melds.length || context.winMethod === 'tsumo') return true;
+        return context.winMethod === 'ron' && placement !== null && placement !== index;
+    }).length;
+    const dragonGroups = triplets.filter(group => group.tiles[0].suit === 'dragon').length;
+    const windGroups = triplets.filter(group => group.tiles[0].suit === 'wind').length;
+    if(concealed === 4) limit('suuankou');
+    if(dragonGroups === 3) limit('daisangen');
+    if(windGroups === 3 && pair.suit === 'wind') limit('shousuushii');
+    if(windGroups === 4) limit('daisuushii');
+    if(kans === 4) limit('suukantsu');
+    if(concealed >= 3) add('sanankou', 2);
+    if(kans === 3) add('sankantsu', 2);
+    if(dragonGroups === 2 && pair.suit === 'dragon') add('shousangen', 2);
+    for(let value = 1; value <= 9; value++){
+        if(['man', 'pin', 'bamboo'].every(suit => triplets.some(group =>
+            group.tiles[0].suit === suit && group.tiles[0].value === value))){
+            add('sanshokuDoukou', 2);
+        }
+    }
+    for(let start = 1; start <= 7; start++){
+        if(['man', 'pin', 'bamboo'].every(suit => sequences.some(group =>
+            group.tiles[0].suit === suit && group.tiles[0].value === start))){
+            add('sanshokuDoujun', isClosed ? 2 : 1);
+        }
+    }
+    for(const suit of ['man', 'pin', 'bamboo']){
+        if([1,4,7].every(start => sequences.some(group =>
+            group.tiles[0].suit === suit && group.tiles[0].value === start))){
+            add('ittsu', isClosed ? 2 : 1);
+        }
+    }
+    const all = [pair, ...groups.flatMap(group => group.tiles)];
+    if(sequences.length && (isHonor(pair) || isTerminal(pair)) && groups.every(group =>
+        group.tiles.some(tile => isHonor(tile) || isTerminal(tile)))){
+        const honors = all.some(isHonor);
+        add(honors ? 'chanta' : 'junchan', honors ? (isClosed ? 2 : 1) : (isClosed ? 3 : 2));
+    }
+    return {ordinary, yakuman};
+}
+
+// Event flags are assertions supplied by game logic after validating the event.
+// Optional boolean flags: doubleRiichi, ippatsu, haitei, houtei,
+// rinshanKaihou, chankan, tenhou, chiihou. Missing flags award nothing.
+// This evaluator does not infer declaration timing, interrupted turns, or kan events.
+// Win authorization (including furiten), fu, dora, payments and final-point
+// arrangement selection belong to the game/scoring layer.
 function evaluateYaku(hand, melds = [], context = {}){
     const yaku = [];
     if(!isWinningHand(hand, melds)){
-        return yaku;
-    }
-    if(isThirteenOrphans(hand, melds)){
-        yaku.push({ name: 'kokushiMusou', yakuman: 1 });
         return yaku;
     }
 
@@ -270,9 +327,17 @@ function evaluateYaku(hand, melds = [], context = {}){
         yaku.push({name: 'menzenTsumo', han: 1});
     }
 
-    if(isClosed && context.riichi){
-        yaku.push({name: 'riichi', han: 1 });
+    const riichi = isClosed && (context.riichi === true || context.doubleRiichi === true);
+    if(riichi){
+        yaku.push({name: context.doubleRiichi ? 'doubleRiichi' : 'riichi', han: context.doubleRiichi ? 2 : 1});
+        if(context.ippatsu === true) yaku.push({name: 'ippatsu', han: 1});
     }
+    const tsumo = context.winMethod === 'tsumo';
+    const ron = context.winMethod === 'ron';
+    if(tsumo && context.rinshanKaihou === true) yaku.push({name: 'rinshanKaihou', han: 1});
+    if(ron && context.chankan === true) yaku.push({name: 'chankan', han: 1});
+    if(tsumo && context.haitei === true && !context.rinshanKaihou) yaku.push({name: 'haitei', han: 1});
+    if(ron && context.houtei === true && !context.chankan) yaku.push({name: 'houtei', han: 1});
 
     if(isAllSimples(hand, melds)){
         yaku.push({name:'tanyao', han: 1});
@@ -288,41 +353,70 @@ function evaluateYaku(hand, melds = [], context = {}){
         yaku.push({name: 'chinitsu', han: isClosed ? 6 : 5});
     }
 
+    const globalYakuman = [];
+    const limit = name => globalYakuman.push({name, yakuman: 1});
+    if(isThirteenOrphans(hand, melds)) limit('kokushiMusou');
+    if(allTiles.every(isHonor)) limit('tsuuiisou');
+    if(allTiles.every(isTerminal)) limit('chinroutou');
+    if(allTiles.every(tile => (tile.suit === 'bamboo' && [2,3,4,6,8].includes(tile.value)) ||
+        (tile.suit === 'dragon' && tile.value === 'green'))) limit('ryuuiisou');
+    if(isClosed && melds.length === 0 && allTiles.every(tile => tile.suit === allTiles[0].suit &&
+        ['man', 'pin', 'bamboo'].includes(tile.suit))){
+        const counts = Array(10).fill(0);
+        allTiles.forEach(tile => counts[tile.value]++);
+        if([1,2,3,4,5,6,7,8,9].every(value => counts[value] >= (value === 1 || value === 9 ? 3 : 1))){
+            limit('chuurenPoutou');
+        }
+    }
+    if(tsumo && isClosed && melds.length === 0){
+        if(context.tenhou === true && context.seatWind === 'east') limit('tenhou');
+        if(context.chiihou === true && context.seatWind && context.seatWind !== 'east') limit('chiihou');
+    }
+    if(allTiles.every(tile => isTerminal(tile) || isHonor(tile))) yaku.push({name: 'honroutou', han: 2});
     const candidates = [];
     if(isSevenPairs(hand, melds)){
-        candidates.push([...yaku, {name: 'chiitoitsu', han: 2}]);
+        candidates.push(globalYakuman.length ? [...globalYakuman] : [...yaku, {name: 'chiitoitsu', han: 2}]);
     }
     for(const arrangement of standardArrangements(hand, melds)){
-        const result = [...yaku];
-        const triplets = arrangement.groups.filter(group => group.type === 'pon' || group.type === 'kan');
-        const yakuhaiHan = triplets.reduce((sum, group) => sum + valueHonorHan(group.tiles[0], context), 0);
-        if(yakuhaiHan > 0) result.push({name: 'yakuhai', han: yakuhaiHan});
-        if(triplets.length === 4) result.push({name: 'toitoi', han: 2});
-        if(hasPinfu(arrangement, melds, isClosed, context)) result.push({name: 'pinfu', han: 1});
-        // Iipeikou: 1 han, closed hand only, for two sequences with identical ranks
-        // in the same suit (e.g. man 123 + man 123). An unrelated open call also
-        // disqualifies it; a concealed kan keeps the hand closed.
-        // Count within this arrangement so it never combines with Seven Pairs.
-        if(isClosed){
-            const sequenceCounts = new Map();
-            for(const group of arrangement.groups){
-                if(group.type !== 'chi') continue;
-                const first = group.tiles[0];
-                const key = `${first.suit}-${first.value}`;
-                sequenceCounts.set(key, (sequenceCounts.get(key) || 0) + 1);
+        for(const placement of winningPlacements(arrangement, melds, context)){
+            const extra = arrangementYaku(arrangement, melds, isClosed, context, placement);
+            const result = [...yaku, ...extra.ordinary];
+            const triplets = arrangement.groups.filter(group => group.type === 'pon' || group.type === 'kan');
+            const yakuhaiHan = triplets.reduce((sum, group) => sum + valueHonorHan(group.tiles[0], context), 0);
+            if(yakuhaiHan > 0) result.push({name: 'yakuhai', han: yakuhaiHan});
+            if(triplets.length === 4) result.push({name: 'toitoi', han: 2});
+            if(hasPinfu(arrangement, melds, isClosed, context)) result.push({name: 'pinfu', han: 1});
+            // Iipeikou: 1 han, closed hand only, for two sequences with identical ranks
+            // in the same suit (e.g. man 123 + man 123). An unrelated open call also
+            // disqualifies it; a concealed kan keeps the hand closed.
+            // Count within this arrangement so it never combines with Seven Pairs.
+            if(isClosed){
+                const sequenceCounts = new Map();
+                for(const group of arrangement.groups){
+                    if(group.type !== 'chi') continue;
+                    const first = group.tiles[0];
+                    const key = `${first.suit}-${first.value}`;
+                    sequenceCounts.set(key, (sequenceCounts.get(key) || 0) + 1);
+                }
+                // Three copies of one sequence contain one pair, not two overlapping pairs.
+                const identicalPairs = [...sequenceCounts.values()]
+                    .reduce((sum, count) => sum + Math.floor(count / 2), 0);
+                // Ryanpeikou replaces Iipeikou, and cannot combine with Seven Pairs.
+                if(identicalPairs === 1) result.push({name: 'iipeikou', han: 1});
+                if(identicalPairs === 2) result.push({name: 'ryanpeikou', han: 3});
             }
-            // Three copies of one sequence contain one pair, not two overlapping pairs.
-            const identicalPairs = [...sequenceCounts.values()]
-                .reduce((sum, count) => sum + Math.floor(count / 2), 0);
-            // Two pairs belong to Ryanpeikou, which is not implemented yet.
-            if(identicalPairs === 1) result.push({name: 'iipeikou', han: 1});
+            const limits = [...globalYakuman, ...extra.yakuman];
+            candidates.push(limits.length ? limits : result);
         }
-        candidates.push(result);
     }
-    // Select the highest han interpretation among the currently supported yaku.
-    // Final point optimization will also need fu when scoring is implemented.
-    const totalHan = result => result.reduce((sum, entry) => sum + entry.han, 0);
-    return candidates.reduce((best, result) => totalHan(result) > totalHan(best) ? result : best, yaku);
+    // Stack distinct yakuman at one limit each; no optional double-yakuman variants.
+    // Compare yakuman first, then han. Fu-based point selection is a scoring concern.
+    if(globalYakuman.length) candidates.push(globalYakuman);
+    const total = (result, key) => result.reduce((sum, entry) => sum + (entry[key] || 0), 0);
+    return candidates.reduce((best, result) => {
+        const difference = total(result, 'yakuman') - total(best, 'yakuman');
+        return difference > 0 || (difference === 0 && total(result, 'han') > total(best, 'han')) ? result : best;
+    }, []);
 }
 
 module.exports = {

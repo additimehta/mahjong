@@ -23,7 +23,10 @@ console.log("Player 2 melds:", game.players[1].melds);
 console.log("Last discard:", game.lastDiscard);
 console.log("Current player:", game.currentPlayer);
 
+game.phase = "response";
+game.handleResponsePhase();
 game.chi(1);
+if(game.responseWindow) game.resolveResponses(game.responseWindow.id);
 
 console.log("\nValid Chi - After:");
 console.log("Player 1 discards:", game.players[0].discards);

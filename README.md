@@ -8,12 +8,13 @@ will own game rules and expose game state and actions through an API.
 
 ### Discard response window
 
-- Each discard opens a fixed **15-second** response window, measured by the server.
+- Each discard allows a maximum **15-second** response window, measured by the server.
+  If nobody can legally claim, play advances immediately.
 - Players submit claims during that window. There is no explicit pass action;
   taking no action means passing when the window expires.
-- The server stores valid claims and resolves them only when the full window
-  expires. Receiving a claim does not immediately change the table or end the
-  window early.
+- The server stores valid claims and resolves early when no unsubmitted claim
+  could beat the best received claim. Otherwise it waits until the deadline.
+- Each player may submit one final claim per discard.
 - Claim priority is **ron > pon > chi**. Arrival order does not override this
   priority: a pon received near the end of the window beats an earlier chi.
 - If multiple players submit pon claims, the first valid pon received by the
@@ -23,14 +24,22 @@ will own game rules and expose game state and actions through an API.
 - Claims received after the deadline or for an old discard are rejected.
 
 For example, if a chi arrives after 2 seconds and a pon arrives after 12 seconds,
-the server awards the pon when the 15-second window closes. A valid ron submitted
+the pon beats the chi. It can resolve immediately if nobody can ron. A valid ron submitted
 within that same window takes priority over both.
 
-These are intended API/game-engine rules; the current chi and pon methods still
-apply calls immediately, so response collection and timed resolution remain to
-be implemented.
+Chi/pon collection, early resolution, and the maximum timer are implemented in
+`Game.handleResponsePhase()`. Submit a claim with
+`game.submitClaim(playerIndex, "chi" | "pon", responseWindowId)`; the window ID
+comes from `game.responseWindow.id`. The server must derive the player identity
+from the connection. Eligibility is private server state, not a public table payload.
+
+Ron authorization is not implemented yet, so the current window only considers
+chi and pon. It must include legal ron eligibility before this flow is used for a
+complete game. Kan is also pending. Timers are in memory; persistence/recovery is
+outside this implementation.
 
 ### Decisions still open
 
-- How to resolve multiple ron claims on the same discard.
+- Ron uses a single winner: the first valid ron received by the server takes
+  priority over all other claims. Implementation is pending legal ron checks.
 - Kan claim handling and its integration with the response window.

@@ -2,6 +2,9 @@ const createTileSet = require("./Deck");
 const shuffleTiles = require("./Shuffle");
 const Player = require("./Player");
 
+const RESPONSE_TIMEOUT_MS = 15000;
+const CLAIM_PRIORITY = {chi: 1, pon: 2};
+
 class Game {
     constructor() {
         this.players = [];
@@ -10,6 +13,13 @@ class Game {
         this.lastDiscard = null;
         this.lastDraw = null;
         this.roundWind = 'east';
+        this.claims = [];
+        this.eligibleClaims = [];
+
+        // stores info about the current oppurunity to claim  a discaded tile 
+        // should store an id, deadline, timer
+        this.responseWindow = null;
+        this.responseSequence = 0;
         // phase can be setup, draw, discard, response pon, chi, win ,
 
         this.phase = "setup";
@@ -53,6 +63,9 @@ class Game {
             return;
         }
         const player = this.players[this.currentPlayer];
+        if(!Number.isInteger(tileIndex) || tileIndex < 0 || tileIndex >= player.hand.length){
+            return;
+        }
         const tile = player.hand.splice(tileIndex, 1)[0];
         player.discards.push(tile);
         this.lastDiscard = tile;
@@ -60,6 +73,126 @@ class Game {
 
         this.phase = "response";
 
+        this.handleResponsePhase();
+    }
+
+    // Keep currentPlayer pointing at the discarder until the response is resolved.
+    handleResponsePhase(){
+        if(this.phase !== "response" || !this.lastDiscard || this.responseWindow){
+            return;
+        }
+        this.claims = [];
+        this.eligibleClaims = [];
+        for(let i = 0; i < 4; i++){
+            // Players cannot claim their own discard.
+            if(i === this.currentPlayer){
+                continue;
+            }
+
+            const player = this.players[i];
+
+            if(player.canPon(this.lastDiscard)){
+                this.eligibleClaims.push({playerIndex: i, action: 'pon'});
+            }
+
+            // Only the next seat can chi, even if others have matching tiles.
+            const isNextPlayer = i === (this.currentPlayer + 1) % 4;
+            if(isNextPlayer && player.canChi(this.lastDiscard)){
+                this.eligibleClaims.push({playerIndex: i, action: 'chi'});
+            }
+
+            // Add ron once legal ron authorization (including furiten) exists.
+        }
+        if(this.eligibleClaims.length === 0){
+            this.handleNoClaim();
+            return;
+        }
+        const id = ++this.responseSequence;
+        const deadline = Date.now() + RESPONSE_TIMEOUT_MS;
+        const timer = setTimeout(() => this.resolveResponses(id), RESPONSE_TIMEOUT_MS);
+        timer.unref?.();
+        this.responseWindow = {id, deadline, timer};
+    }
+
+    submitClaim(playerIndex, action, windowId){
+        const window = this.responseWindow;
+        if(this.phase !== 'response' || !window || window.id !== windowId){
+            return false;
+        }
+        if(Date.now() >= window.deadline){
+            this.resolveResponses(window.id);
+            return false;
+        }
+
+        const isEligible = this.eligibleClaims.some(entry =>
+            entry.playerIndex === playerIndex && entry.action === action);
+        if(!isEligible){
+            return false;
+        }
+
+        const alreadyClaimed = this.claims.some(claim => claim.playerIndex === playerIndex);
+        if(alreadyClaimed){
+            return false;
+        }
+
+        this.claims.push({playerIndex, action});
+
+        // right after submission check the best claim and see if there is any possible higher claim
+        // this is in case of conccurent claims being pushed 
+        const bestClaim = this.getBestClaim();
+        if(!this.hasPossibleHigherClaim(bestClaim)){
+            this.resolveResponses(window.id);
+        }
+        return true;
+    }
+
+    getBestClaim(){
+        let bestClaim = null;
+        for(const claim of this.claims){
+            // Keeping the earlier claim on a tie preserves server receipt order.
+            if(!bestClaim || CLAIM_PRIORITY[claim.action] > CLAIM_PRIORITY[bestClaim.action]){
+                bestClaim = claim;
+            }
+        }
+        return bestClaim;
+    }
+
+    hasPossibleHigherClaim(bestClaim){
+        for(const eligible of this.eligibleClaims){
+            const alreadyClaimed = this.claims.some(claim =>
+                claim.playerIndex === eligible.playerIndex);
+            if(alreadyClaimed){
+                continue;
+            }
+
+            if(CLAIM_PRIORITY[eligible.action] > CLAIM_PRIORITY[bestClaim.action]){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    resolveResponses(windowId){
+        if(!this.responseWindow || this.responseWindow.id !== windowId){
+            return;
+        }
+
+        const bestClaim = this.getBestClaim();
+        this.clearResponseWindow();
+        if(bestClaim){
+            this.applyClaim(bestClaim.playerIndex, bestClaim.action);
+        }else{
+            this.handleNoClaim();
+        }
+    }
+
+    clearResponseWindow(){
+        if(this.responseWindow){
+            clearTimeout(this.responseWindow.timer);
+        }
+        this.responseWindow = null;
+        this.claims = [];
+        this.eligibleClaims = [];
     }
 
     nextPlayer(){
@@ -112,55 +245,28 @@ class Game {
     }
 
 
-    pon(playerIndex){
-        if(this.phase != "response"){ 
-            return;
-        }
-
-        const discardingPlayer = this.players[this.currentPlayer];
-        const player = this.players[playerIndex];
-
-
-        if(!player.canPon(this.lastDiscard)){
-            return;
-        }
-
-        player.pon(this.lastDiscard); // add the discarded tile to the player's melds
-        this.lastDraw = null;
-        discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
-        this.lastDiscard = null;
-        this.currentPlayer = playerIndex;
-        
-        this.phase = "discard";
-
+    pon(playerIndex, windowId = this.responseWindow?.id){
+        return this.submitClaim(playerIndex, 'pon', windowId);
     }
 
-    chi(playerIndex){
-        if(this.phase != "response"){ 
-            return;
-        } 
-        const nextPlayerIndex = (this.currentPlayer + 1) % 4;
-        if(playerIndex !== nextPlayerIndex){
-            return; // Only the next player can Chi
-        }
+    chi(playerIndex, windowId = this.responseWindow?.id){
+        return this.submitClaim(playerIndex, 'chi', windowId);
+    }
+
+    // Internal mutation step; API callers submit claims through submitClaim().
+    applyClaim(playerIndex, action){
         const discardingPlayer = this.players[this.currentPlayer];
         const player = this.players[playerIndex];
-
-        if(!player.canChi(this.lastDiscard)){
-            return;
-        }
-
-        player.chi(this.lastDiscard); // add the discarded tile to the player's melds
-        this.lastDraw = null;
-        discardingPlayer.discards.pop(); // remove the last discard from the discarding player's discards
+        player[action](this.lastDiscard);
+        discardingPlayer.discards.pop();
         this.lastDiscard = null;
+        this.lastDraw = null;
         this.currentPlayer = playerIndex;
-
-        this.phase = "discard";
+        this.phase = 'discard';
     }
 
     handleNoClaim(){
-        if(this.phase != "response"){
+        if(this.phase != "response" || this.responseWindow){
             return;
         }
 

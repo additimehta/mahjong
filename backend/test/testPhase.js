@@ -25,6 +25,9 @@ function testNormalTurnFlow(){
         "A player should not be able to draw twice"
     );
 
+    // Guarantee a competing pon so this test exercises the response phase.
+    const discard = game.players[0].hand[0];
+    game.players[2].hand = [{...discard}, {...discard}];
     game.discardTile(0);
     assert.strictEqual(game.phase, "response");
     assert.strictEqual(game.players[0].discards.length, 1);
@@ -45,7 +48,7 @@ function testNormalTurnFlow(){
         "A player should not be able to draw during the response phase"
     );
 
-    game.handleNoClaim();
+    game.resolveResponses(game.responseWindow.id);
     assert.strictEqual(game.phase, "draw");
     assert.strictEqual(game.currentPlayer, 1);
     assert.strictEqual(game.lastDiscard, null);
@@ -67,6 +70,7 @@ function testPonFlow(){
         new Tile("man", 3)
     ];
 
+    game.handleResponsePhase();
     game.pon(2);
 
     assert.strictEqual(game.phase, "discard");
@@ -93,7 +97,9 @@ function testChiFlow(){
         new Tile("man", 7)
     ];
 
+    game.handleResponsePhase();
     game.chi(1);
+    if(game.responseWindow) game.resolveResponses(game.responseWindow.id);
 
     assert.strictEqual(game.phase, "discard");
     assert.strictEqual(game.currentPlayer, 1);

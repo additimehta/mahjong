@@ -25,7 +25,10 @@ console.log("Player 1 melds:", game.players[1].melds);
 console.log("Current player:", game.currentPlayer);
 
 // Player 1 Pons
+game.phase = "response";
+game.handleResponsePhase();
 game.pon(1);
+if(game.responseWindow) game.resolveResponses(game.responseWindow.id);
 
 console.log("\nAfter Pon:");
 console.log("Player 1 hand:", game.players[1].hand);
